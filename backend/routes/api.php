@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\Routes;
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PropostaController;
 
 
