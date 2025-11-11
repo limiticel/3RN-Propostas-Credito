@@ -46,7 +46,7 @@ class PropostaController extends Controller
     public function index(Request $request)
     {
         $filtros = $request->only(['busca','status','page','per_page']);
-        $propostas = $this->propostaService->lista($filtros);
+        $propostas = $this->propostaService->listar($filtros);
         return PropostaResource::collection($propostas);
     }
 
