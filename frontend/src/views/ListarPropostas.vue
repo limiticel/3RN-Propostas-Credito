@@ -47,7 +47,7 @@
           <td class="acoes">
             <button @click="verDetalhes(p)">👁️</button>
             <button @click="editarStatus(p)">✏️</button>
-            <button @click="cancelarProposta(p)">❌</button>
+            <button @click="excluirProposta(p)">❌</button>
           </td>
         </tr>
       </tbody>
@@ -158,8 +158,8 @@ const editarStatus = async (p) => {
   }
 }
 
-const cancelarProposta = async (p) => {
-  if (!confirm(`Cancelar proposta de ${p.nome_cliente}?`)) return
+const excluirProposta = async (p) => {
+  if (!confirm(`excluir proposta de ${p.nome_cliente}?`)) return
   try {
     await axios.delete(`/propostas/${p.id}`)
     mensagem.value = '🗑️ Proposta cancelada!'
