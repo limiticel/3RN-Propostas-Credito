@@ -102,8 +102,8 @@ class PropostaController extends Controller
             ]);
         }    
 
-        // não permiet retorno para "em_analise" caso seja aprovada ou não
-        if (in_array($proposta->status, ['aprovada','reprovada']) && $novoStatus === 'em_analise')
+        // não permite retorno para "em_analise" caso seja aprovada ou não
+        if (in_array($proposta->status, ['aprovada','reprovada']))//&& $novoStatus === 'em_analise' uma possiblidade porém pode alterar status aprovado
         {
             throw ValidationException::withMessages([
                 'status'=> 'Não é permitido retornar para "em_analise" após aprovação ou reprovação.'
