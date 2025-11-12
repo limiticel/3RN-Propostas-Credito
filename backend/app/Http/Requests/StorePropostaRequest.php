@@ -44,11 +44,11 @@ class StorePropostaRequest extends FormRequest
                 'string',
                 'size:14',
                 'regex:/^\d{3}\.\d{3}\.\d{3}\-\d{2}$/',
-                'unique:propostas,cpf',
+                
             ],
             'valor_solicitado' => 'required|numeric|min:1000|max:50000',
             'quantidade_parcelas' => 'required|integer|min:6|max:60',
-            'salario' => 'required|numeric|min:1518.00',
+            'salario' => 'required|numeric|min:1500.00',
         ];
     }
 
@@ -74,7 +74,7 @@ class StorePropostaRequest extends FormRequest
             'quantidade_parcelas.max' => 'A quantidade de parcelas deve ser no máximo 60.',
             'salario.required' => 'O salário é obrigatório.',
             'salario.numeric' => 'O salário deve ser um número.',
-            'salario.min' => 'O salário deve ser no mínimo R$ 1.518,00.',
+            'salario.min' => 'O salário deve ser no mínimo R$ 1.500,00.',
         ];
     }
 
