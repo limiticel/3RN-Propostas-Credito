@@ -31,7 +31,7 @@ return new class extends Migration
 
         // Dados do cliente (Nome, CPF)
         $table->string('nome_cliente');
-        $table->string('cpf', 14)->unique();
+        $table->string('cpf', 14);
             
         //sobre a proposta
         $table->decimal('valor_solicitado', 10, 2);
