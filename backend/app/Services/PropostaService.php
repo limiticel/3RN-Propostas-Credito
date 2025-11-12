@@ -81,16 +81,7 @@ class PropostaService
                 'cpf' => 'O CPF informado é inválido.',
             ]);
         }
-
-        $existeEmAnalise = Proposta::where('cpf', $dados['cpf'])
-            ->where('status', 'em_analise')
-            ->exists();
-
-        if ($existeEmAnalise) {
-            throw ValidationException::withMessages([
-                'cpf' => 'Já existe uma proposta em análise para este CPF.',
-            ]);
-        }
+        
 
         $margem = $dados['salario'] * 0.30;
 
@@ -143,6 +134,24 @@ class PropostaService
         $proposta = Proposta::findOrFail($id);
 
         $validos = ['rascunho', 'em_analise', 'aprovada', 'reprovada', 'cancelada'];
+        
+
+        // Bloqueia mais de uma proposta em análise para o mesmo CPF
+        if ($novoStatus === 'em_analise') {
+
+            $cpf = $proposta->cpf;
+
+            $jaExiste = Proposta::where('cpf', $cpf)
+                ->where('status', 'em_analise')
+                ->where('id', '!=', $proposta->id) // ignora a própria proposta
+                ->exists();
+
+            if ($jaExiste) {
+                throw ValidationException::withMessages([
+                    'status' => 'Já existe outra proposta em análise para este CPF.'
+                ]);
+            }
+        }
 
         if (!in_array($novoStatus, $validos)) {
             throw ValidationException::withMessages([
