@@ -91,7 +91,7 @@ class PropostaController extends Controller
         $proposta = Proposta::findOrFail($id);
         $novoStatus = $request->input('status');
 
-        $statusPermitidos = ['rascunho','em_analise','aprovada','reprovada'];
+        $statusPermitidos = ['rascunho','em_analise','aprovada','reprovada','cancelada'];
 
         // abaixo a verificação de validação do status
         if (!in_array($novoStatus, $statusPermitidos))
@@ -102,8 +102,17 @@ class PropostaController extends Controller
             ]);
         }    
 
+        // não pode mudar a proposta após o cancelamento
+        if (in_array($proposta->status, ['cancelada']))//&& $novoStatus === 'em_analise' uma possiblidade porém pode alterar status aprovado
+        {
+            throw ValidationException::withMessages([
+                'status'=> 'Não é permitido retornar para "em_analise" após aprovação ou reprovação.'
+
+            ]);
+        }
+
         // não permite retorno para "em_analise" caso seja aprovada ou não
-        if (in_array($proposta->status, ['aprovada','reprovada']))//&& $novoStatus === 'em_analise' uma possiblidade porém pode alterar status aprovado
+        if (in_array($proposta->status, ['aprovada','reprovada']) && $novoStatus != "cancelada")//&& $novoStatus === 'em_analise' uma possiblidade porém pode alterar status aprovado
         {
             throw ValidationException::withMessages([
                 'status'=> 'Não é permitido retornar para "em_analise" após aprovação ou reprovação.'
