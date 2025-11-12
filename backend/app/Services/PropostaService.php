@@ -6,87 +6,82 @@ use App\Models\Proposta;
 use Illuminate\Validation\ValidationException;
 
 /**
-     * Classe PropostaService
-     * 
-     * responsável por centralizar as regras de negócio da entidade Proposta.
-     * Aqui ficam todos os calculos, validações e operações que envolvem 
-     * a logica alem do simples CRUD.
-     * 
-     * @package App\Sevices
-     */
+ * Service: PropostaService
+ * 
+ * Centraliza toda a logica relacionada as propostas de credito
+ * 
+ * Aqui ficam:
+ *  - Validações especificas de dominio (CPF, margem, regras de status)
+ *  - Calculos financeiros (juros compostos, parcela e valor total)
+ *  - Regras de transição de status
+ *  - Restrições sobre exclusão ou atualização
+ * 
+ * O controlador apenas chama este service e retorna as propostas ao cliente.
+ */
 
 class PropostaService
 {
     /**
-     * Lista as propostas cadastradas com suporte a filtros e paginação
+     * Lista propostas com filtros opcionais (busca, status e paginação)
      * 
-     * @param array $filtros Filtros de pesquisa, incluindo "busca", "status" e 'per_page".
-     * @return \Illuminate\Contracts\Pagination\LenghtAwarePaginator 
+     * @param array $filtros
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    
     public function listar($filtros)
     {
         $query = Proposta::query();
 
-        // Filtro de busca (por nome ou CPF)
         if (!empty($filtros['busca'])) {
             $busca = $filtros['busca'];
             $query->where(function ($q) use ($busca) {
                 $q->where('nome_cliente', 'like', "%{$busca}%")
-                ->orWhere('cpf', 'like', "%{$busca}%");
+                    ->orWhere('cpf', 'like', "%{$busca}%");
             });
         }
 
-        // Filtro por status
         if (!empty($filtros['status'])) {
             $query->where('status', $filtros['status']);
         }
 
-        // Ordenação: mais recentes primeiro
         $query->orderByDesc('created_at');
 
-        // Paginação
-        $porPagina = $filtros['per_page'] ?? 5;
-        return $query->paginate($porPagina);
+        return $query->paginate($filtros['per_page'] ?? 5);
     }
 
     /**
-     * Busca uma proposta especifica pelo ID.
+     * busca uma proposta especifica pelo ID
      * 
-     * @param int $id ID da proposta
-     * @return \APP\Models\Proposta
-     * 
-     * throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     * @param int $id
+     * @return Proposta
      */
-
 
     public function buscar($id)
     {
-        // Conceito basico do modelo da propoosta (bd)
         return Proposta::findOrFail($id);
     }
 
-
     /**
-     * cria umva nova proposta aplicando validações e calculos de negocio.
+     * Cria uma nova proposta aplicando:
+     *  - Validação de CPF
+     *  - Verificação de proposta já em analise
+     *  - Cálculo de margem
+     *  - Calculo de parcela via juros compostos (2,5% a.m)
+     *  - Validação se parcela cabe na margem (<= 30% da renda)
      * 
-     * @param array $dados Dados validados da requisição
-     * @return \App\Models\Proposta
+     * @param array $dados
+     * @return Proposta
      * 
-     * 
-     * @throws \Illuminate\Validation\ValidationException se ocorrer erro de validação
-     * 
+     * @throws ValidationException
      */
+
     public function criar(array $dados)
     {
-        //  Validar CPF real
         if (!$this->validarCPF($dados['cpf'])) {
             throw ValidationException::withMessages([
                 'cpf' => 'O CPF informado é inválido.',
             ]);
         }
 
-        // Verificar se já existe proposta "em_analise" para o mesmo CPF
         $existeEmAnalise = Proposta::where('cpf', $dados['cpf'])
             ->where('status', 'em_analise')
             ->exists();
@@ -97,58 +92,142 @@ class PropostaService
             ]);
         }
 
-        //  Calcular a margem (30% do salário)
-        $margemDisponivel = $dados['salario'] * 0.30;
+        $margem = $dados['salario'] * 0.30;
 
-        //  Calcular o valor das parcelas usando juros compostos (2.5% a.m.)
         $taxa = 0.025;
         $parcelas = $dados['quantidade_parcelas'];
         $valorSolicitado = $dados['valor_solicitado'];
 
-        // Fórmula de juros compostos: PMT = P * (i*(1+i)^n) / ((1+i)^n - 1)
-        $valorParcela = $valorSolicitado * ($taxa * pow(1 + $taxa, $parcelas)) / (pow(1 + $taxa, $parcelas) - 1);
-        $valorTotal = $valorParcela * $parcelas;
+        $parcela = $valorSolicitado * ($taxa * pow(1 + $taxa, $parcelas)) 
+                    / (pow(1 + $taxa, $parcelas) - 1);
 
-        // Verificar se a parcela ultrapassa 30% do salário
-        if ($valorParcela > $margemDisponivel) {
+        $valorTotal = $parcela * $parcelas;
+
+        if ($parcela > $margem) {
             throw ValidationException::withMessages([
-                'valor_parcela' => 'O valor da parcela ultrapassa 30% da renda. Proposta recusada.',
+                'valor_parcela' => 'O valor da parcela ultrapassa 30% da renda.',
             ]);
         }
 
-        //  Atribuir dados calculados
         $dados['taxa_juros'] = $taxa;
-        $dados['valor_parcela'] = round($valorParcela, 2);
+        $dados['valor_parcela'] = round($parcela, 2);
         $dados['valor_total'] = round($valorTotal, 2);
-        $dados['margem_disponivel'] = round($margemDisponivel, 2);
-        $dados['status'] = 'rascunho'; // Status inicial obrigatório
+        $dados['margem_disponivel'] = round($margem, 2);
+        $dados['status'] = 'rascunho';
         $dados['observacoes'] = $dados['observacoes'] ?? null;
 
-        // Criar proposta
         return Proposta::create($dados);
     }
 
     /**
-     * Valida um CPF brasileiro de forma algoritmica
+     * Atualiza o status de uma proposta seguindo regras de negocio
      * 
-     * @param string $cpf CPF no formato "000.000.000-00"
-     * @return bool True se o CPF for valido, False caso contrario
+     * Fluxo permitido:
+     *  - rascunho -> em analise
+     *  - em analise -> aprovada/reprovada/cancelada 
+     *  - reporvada -> somente cancelada
      * 
+     * Não permitido:
+     * - Proposta aprovada não pode mudar MAIS NADA
+     * - Proposta cancelada nunca pode mudar
      * 
+     * @param int $id
+     * @param string $novoStatus
+     * @return Proposta
      * 
+     * @throws ValidationException
+     */
+
+    public function atualizarStatus($id, $novoStatus)
+    {
+        $proposta = Proposta::findOrFail($id);
+
+        $validos = ['rascunho', 'em_analise', 'aprovada', 'reprovada', 'cancelada'];
+
+        if (!in_array($novoStatus, $validos)) {
+            throw ValidationException::withMessages([
+                'status' => 'Status inválido.'
+            ]);
+        }
+
+        // Cancelada NÃO pode mudar nunca
+        if ($proposta->status === 'cancelada') {
+            throw ValidationException::withMessages([
+                'status' => 'Propostas canceladas não podem ser modificadas.'
+            ]);
+        }
+
+        // Aprovada NÃO pode mudar para NENHUM outro status
+        if ($proposta->status === 'aprovada') {
+            throw ValidationException::withMessages([
+                'status' => 'Propostas aprovadas não podem ter o status alterado.'
+            ]);
+        }
+
+        // Reprovada só pode virar cancelada (mas isso é opcional; você decide)
+        if ($proposta->status === 'reprovada' && $novoStatus !== 'cancelada') {
+            throw ValidationException::withMessages([
+                'status' => 'Propostas reprovadas só podem ser canceladas.'
+            ]);
+        }
+
+        $proposta->status = $novoStatus;
+        $proposta->save();
+
+        return $proposta;
+    }
+
+    /**
+     * Exclui uma proposta, desde que permitido
+     * 
+     * regras:
+     * - Propostas aprovadas não podem ser excluidas.
+     * - Cancelada e reprovadas podem ser excluidas normalmente.
+     * 
+     * @param int $id
+     * @return string Mensagem de sucesso
+     * 
+     * @throws ValidationException
+     */
+    public function deletar($id)
+    {
+        $proposta = Proposta::find($id);
+
+        if (!$proposta) {
+            throw ValidationException::withMessages([
+                'id' => 'Proposta não encontrada.'
+            ]);
+        }
+
+        if ($proposta->status === 'aprovada') {
+            throw ValidationException::withMessages([
+                'status' => 'Propostas aprovadas não podem ser excluídas.'
+            ]);
+        }
+
+        $proposta->delete();
+
+        return 'Proposta excluída com sucesso.';
+    }
+
+    /**
+     * Valida o CPF brasileiro utilizando o algoritmo oficial
+     * 
+     * @param string $cpf
+     * @return boll
      */
 
     private function validarCPF(string $cpf): bool
     {
-        // Remover caracteres não numéricos
-        $cpf = preg_replace('/[^0-9]/', '', $cpf);
+        $cpf = preg_replace('/\D/', '', $cpf);
 
-        // Verificar se tem 11 dígitos ou é repetido
+
+        // Deve ter extamente 11 digitos e nao pode ser repetido
         if (strlen($cpf) != 11 || preg_match('/(\d)\1{10}/', $cpf)) {
             return false;
         }
 
-        // Calcular dígitos verificadores
+        // Calculo dos digitos verificadores
         for ($t = 9; $t < 11; $t++) {
             $d = 0;
             for ($c = 0; $c < $t; $c++) {
@@ -163,4 +242,3 @@ class PropostaService
         return true;
     }
 }
-
