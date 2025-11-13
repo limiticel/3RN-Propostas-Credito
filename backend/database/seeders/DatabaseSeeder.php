@@ -11,16 +11,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // cria usuário de teste (opcional)
-        \App\Models\User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-
-        // executa o seeder das propostas
-        $this->call([
-            PropostaSeeder::class,
-        ]);
+        $this->call(PropostaSeeder::class);
     }
 
 }
