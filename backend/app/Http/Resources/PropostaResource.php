@@ -17,6 +17,7 @@ class PropostaResource extends JsonResource
             'valor_parcela' => $this->valor_parcela,
             'valor_total' => $this->valor_total,
             'status' => $this->status,
+            'observacoes'=>$this->observacoes,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

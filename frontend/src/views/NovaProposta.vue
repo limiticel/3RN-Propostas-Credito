@@ -203,8 +203,10 @@ const enviarProposta = async () => {
       salario: parseFloat(proposta.value.salario.replace(/[R$.\s]/g, '').replace(',', '.')),
       valor_solicitado: parseFloat(proposta.value.valor_solicitado.replace(/[R$.\s]/g, '').replace(',', '.')),
       quantidade_parcelas: Number(proposta.value.quantidade_parcelas),
-      observacoes: proposta.value.observacoes
+      observacoes: proposta.value.observacoes || null
     }
+
+
 
     // Envia a proposta para o backend
     const response = await axios.post('/propostas', body)

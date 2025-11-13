@@ -49,6 +49,8 @@ class StorePropostaRequest extends FormRequest
             'valor_solicitado' => 'required|numeric|min:1000|max:50000',
             'quantidade_parcelas' => 'required|integer|min:6|max:60',
             'salario' => 'required|numeric|min:1500.00',
+            
+            'observacoes' => 'nullable|string|max:5000'
         ];
     }
 

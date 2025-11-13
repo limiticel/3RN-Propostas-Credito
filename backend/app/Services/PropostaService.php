@@ -107,6 +107,9 @@ class PropostaService
         $dados['status'] = 'rascunho';
         $dados['observacoes'] = $dados['observacoes'] ?? null;
 
+
+
+
         return Proposta::create($dados);
     }
 
